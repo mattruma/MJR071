@@ -20,6 +20,8 @@ namespace FunctionApp1
 
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
 
+            log.LogInformation(requestBody);
+
             await events.AddAsync(requestBody);
 
             return new OkObjectResult(requestBody);
