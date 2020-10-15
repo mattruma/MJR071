@@ -1,11 +1,9 @@
-using Microsoft.Azure.EventHubs;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.WebJobs;
+using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
-using System.Linq;
-using System.Text;
+using System.IO;
 using System.Threading.Tasks;
 
 namespace FunctionApp1
@@ -13,38 +11,18 @@ namespace FunctionApp1
     public static class Function1
     {
         [FunctionName(nameof(Function1))]
-        [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "<Pending>")]
-        public static async Task Run(
-            [EventHubTrigger("todos", Connection = "EVENTHUB_CONNECTIONSTRING")] EventData[] events,
-            ILogger log)
+        public static async Task<IActionResult> Run(
+            [HttpTrigger(AuthorizationLevel.Function, "post", Route = null)] HttpRequest req,
+            ILogger log,
+            [EventHub("todos", Connection = "EVENTHUB_CONNECTIONSTRING")] IAsyncCollector<string> events)
         {
-            var exceptions = new List<Exception>();
+            log.LogInformation($"{nameof(Function1)} function processed a request.");
 
-            foreach (EventData eventData in events)
-            {
-                try
-                {
-                    string messageBody = Encoding.UTF8.GetString(eventData.Body.Array, eventData.Body.Offset, eventData.Body.Count);
+            string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
 
-                    // Replace these two lines with your processing logic.
-                    log.LogInformation($"{nameof(Function1)} function processed a message: {messageBody}");
-                    await Task.Yield();
-                }
-                catch (Exception e)
-                {
-                    // We need to keep processing the rest of the batch - capture this exception and continue.
-                    // Also, consider capturing details of the message that failed processing so it can be processed again later.
-                    exceptions.Add(e);
-                }
-            }
+            await events.AddAsync(requestBody);
 
-            // Once processing of the batch is complete, if any messages in the batch failed processing throw an exception so that there is a record of the failure.
-
-            if (exceptions.Count > 1)
-                throw new AggregateException(exceptions);
-
-            if (exceptions.Count == 1)
-                throw exceptions.Single();
+            return new OkObjectResult(requestBody);
         }
     }
 }
